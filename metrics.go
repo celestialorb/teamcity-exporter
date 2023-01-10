@@ -234,17 +234,17 @@ type BuildStatus int
 type BuildState int
 
 const (
-	BuildQueued BuildState = iota
+	BuildStateUnknown BuildState = iota
+	BuildQueued
 	BuildFinished
 	BuildRunning
 	BuildDeleted
-	BuildStateUnknown
 )
 
 const (
-	BuildSuccess BuildStatus = iota
+	BuildStatusUnknown BuildStatus = iota
+	BuildSuccess
 	BuildFailure
-	BuildStatusUnknown
 )
 
 func ParseBuildState(s string) BuildState {
