@@ -19,14 +19,14 @@ environment variable.
 
 The metrics exported by this exporter are described in the table below.
 
-| Name                           | Description                                             | Labels                                    |
-|--------------------------------|---------------------------------------------------------|-------------------------------------------|
-| `teamcity_projects`            | The total number of subprojects for a TeamCity project. | `project_id`                              |
-| `teamcity_project_build_types` | The total number of build types for a TeamCity project. | `project_id`                              |
-| `teamcity_build_start_time`    | The start time of a TeamCity build job.                 | `project_id`, `build_type_id`, `build_id` |
-| `teamcity_build_finish_time`   | The finish time of a TeamCity build job.                | `project_id`, `build_type_id`, `build_id` |
-| `teamcity_build_state`         | The state of a TeamCity build job.                      | `project_id`, `build_type_id`, `build_id` |
-| `teamcity_build_status`        | The status of a TeamCity build job.                     | `project_id`, `build_type_id`, `build_id` |
+| Name                                 | Description                                             | Labels                                    |
+|--------------------------------------|---------------------------------------------------------|-------------------------------------------|
+| `teamcity_projects_total`            | The total number of subprojects for a TeamCity project. | `project_id`                              |
+| `teamcity_project_build_types_total` | The total number of build types for a TeamCity project. | `project_id`                              |
+| `teamcity_build_start_time`          | The start time of a TeamCity build job.                 | `project_id`, `build_type_id`, `build_id` |
+| `teamcity_build_finish_time`         | The finish time of a TeamCity build job.                | `project_id`, `build_type_id`, `build_id` |
+| `teamcity_build_state`               | The state of a TeamCity build job.                      | `project_id`, `build_type_id`, `build_id` |
+| `teamcity_build_status`              | The status of a TeamCity build job.                     | `project_id`, `build_type_id`, `build_id` |
 
 ### Build State
 

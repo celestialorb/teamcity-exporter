@@ -32,13 +32,13 @@ type TeamCityCollector struct {
 func NewTeamCityCollector() *TeamCityCollector {
 	return &TeamCityCollector{
 		projects: prometheus.NewDesc(
-			"teamcity_projects",
+			"teamcity_projects_total",
 			"The total number of subprojects for a TeamCity project.",
 			[]string{"project_id"},
 			prometheus.Labels{},
 		),
 		buildTypes: prometheus.NewDesc(
-			"teamcity_project_build_types",
+			"teamcity_project_build_types_total",
 			"The total number of build types for a TeamCity project.",
 			[]string{"project_id"},
 			prometheus.Labels{},
