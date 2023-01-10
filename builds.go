@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/cvbarros/go-teamcity/teamcity"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,87 +13,128 @@ import (
 	viper "github.com/spf13/viper"
 )
 
-type TeamCityCollector struct {
+type BuildStatus int
+type BuildState int
+
+const (
+	BuildStateUnknown BuildState = iota
+	BuildQueued
+	BuildFinished
+	BuildRunning
+	BuildDeleted
+)
+
+const (
+	BuildStatusUnknown BuildStatus = iota
+	BuildSuccess
+	BuildFailure
+)
+
+func ParseBuildState(s string) BuildState {
+	switch s {
+	case "queued":
+		return BuildQueued
+	case "finished":
+		return BuildFinished
+	case "running":
+		return BuildRunning
+	case "deleted":
+		return BuildDeleted
+	}
+	return BuildStateUnknown
+}
+
+func ParseBuildStatus(s string) BuildStatus {
+	switch s {
+	case "SUCCESS":
+		return BuildSuccess
+	case "FAILURE":
+		return BuildFailure
+	}
+	return BuildStatusUnknown
+}
+
+type Build struct {
+	ID          uint64       `json:"id"`
+	BuildTypeID string       `json:"buildTypeId"`
+	Status      string       `json:"status"`
+	State       string       `json:"state"`
+	StartDate   TeamCityTime `json:"startDate,omitempty"`
+	FinishDate  TeamCityTime `json:"finishDate,omitempty"`
+}
+
+type BuildResponse struct {
+	Count    uint64  `json:"count"`
+	HRef     string  `json:"href,omitempty"`
+	NextHRef string  `json:"nextHref,omitempty"`
+	PrevHRef string  `json:"prevHref,omitempty"`
+	Builds   []Build `json:"build"`
+}
+
+type TeamCityBuildsCollector struct {
 	client *teamcity.Client
 
-	// TeamCity project metrics.
-	projects   *prometheus.Desc
-	buildTypes *prometheus.Desc
-
-	// TeamCity build metrics.
 	buildStartTime  *prometheus.Desc
 	buildFinishTime *prometheus.Desc
 	buildState      *prometheus.Desc
 	buildStatus     *prometheus.Desc
 }
 
-func NewTeamCityCollector() *TeamCityCollector {
-	return &TeamCityCollector{
-		projects: prometheus.NewDesc(
-			"teamcity_projects_total",
-			"The total number of subprojects for a TeamCity project.",
-			[]string{"project_id"},
-			prometheus.Labels{},
-		),
-		buildTypes: prometheus.NewDesc(
-			"teamcity_project_build_types_total",
-			"The total number of build types for a TeamCity project.",
-			[]string{"project_id"},
-			prometheus.Labels{},
-		),
+func NewTeamCityBuildsCollector(client *teamcity.Client) *TeamCityBuildsCollector {
+	constLabels := prometheus.Labels{}
 
+	return &TeamCityBuildsCollector{
+		// Set the TeamCity client.
+		client: client,
+
+		// Build metric descriptions.
 		buildStartTime: prometheus.NewDesc(
 			"teamcity_build_start_time",
 			"The start time of a TeamCity build job.",
 			[]string{"project_id", "build_type_id", "build_id"},
-			prometheus.Labels{},
+			constLabels,
 		),
 
 		buildFinishTime: prometheus.NewDesc(
 			"teamcity_build_finish_time",
 			"The finish time of a TeamCity build job.",
 			[]string{"project_id", "build_type_id", "build_id"},
-			prometheus.Labels{},
+			constLabels,
 		),
 
 		buildState: prometheus.NewDesc(
 			"teamcity_build_state",
 			"The state of a TeamCity build job.",
 			[]string{"project_id", "build_type_id", "build_id"},
-			prometheus.Labels{},
+			constLabels,
 		),
 
 		buildStatus: prometheus.NewDesc(
 			"teamcity_build_status",
 			"The status of a TeamCity build job.",
 			[]string{"project_id", "build_type_id", "build_id"},
-			prometheus.Labels{},
+			constLabels,
 		),
 	}
 }
 
-type TeamCityTime struct {
-	time.Time
+func (collector TeamCityBuildsCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- collector.buildFinishTime
+	ch <- collector.buildStartTime
+	ch <- collector.buildState
+	ch <- collector.buildStatus
 }
 
-func (t *TeamCityTime) UnmarshalJSON(b []byte) error {
-	text := strings.Trim(string(b), "\"")
-	tm, err := time.Parse("20060102T150405-0700", text)
-	t.Time = tm
-	return err
-}
+func (collector TeamCityBuildsCollector) Collect(ch chan<- prometheus.Metric) {
+	logrus.Info("collecting TeamCity builds metrics")
 
-func (collector TeamCityCollector) Describe(ch chan<- *prometheus.Desc) {}
-func (collector TeamCityCollector) Collect(ch chan<- prometheus.Metric) {
-	logrus.Info("collecting TeamCity metrics")
-
-	err := collector.collectProjectMetrics(viper.GetString("root.project.id"), ch)
+	err := collector.collectBuildMetrics(viper.GetString("root.project.id"), ch)
 	if err != nil {
 		logrus.Error(err)
 	}
 }
 
-func (collector *TeamCityCollector) collectProjectMetrics(identifier string, ch chan<- prometheus.Metric) error {
+func (collector *TeamCityBuildsCollector) collectBuildMetrics(identifier string, ch chan<- prometheus.Metric) error {
 	logger := logrus.WithFields(logrus.Fields{"project": identifier})
 
 	logger.Info("collecting project")
@@ -103,24 +142,6 @@ func (collector *TeamCityCollector) collectProjectMetrics(identifier string, ch 
 	if err != nil {
 		return err
 	}
-
-	// Set the subproject count metric.
-	logger.WithFields(logrus.Fields{"value": p.ChildProjects.Count}).Debug("setting project count metric")
-	ch <- prometheus.MustNewConstMetric(
-		collector.projects,
-		prometheus.GaugeValue,
-		float64(p.ChildProjects.Count),
-		p.ID,
-	)
-
-	// Set the build type count metric.
-	logger.WithFields(logrus.Fields{"value": p.BuildTypes.Count}).Debug("setting build type count metric")
-	ch <- prometheus.MustNewConstMetric(
-		collector.buildTypes,
-		prometheus.GaugeValue,
-		float64(p.BuildTypes.Count),
-		p.ID,
-	)
 
 	// Collect metrics on builds for the project.
 	err = collector.collectProjectBuildMetrics(p.ID, ch)
@@ -133,7 +154,7 @@ func (collector *TeamCityCollector) collectProjectMetrics(identifier string, ch 
 	wg.Add(p.ChildProjects.Count)
 	for _, subproject := range p.ChildProjects.Items {
 		go func(identifier string) {
-			err := collector.collectProjectMetrics(identifier, ch)
+			err := collector.collectBuildMetrics(identifier, ch)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -148,7 +169,7 @@ func (collector *TeamCityCollector) collectProjectMetrics(identifier string, ch 
 	return nil
 }
 
-func (collector *TeamCityCollector) collectProjectBuildMetrics(identifier string, ch chan<- prometheus.Metric) error {
+func (collector *TeamCityBuildsCollector) collectProjectBuildMetrics(identifier string, ch chan<- prometheus.Metric) error {
 	logger := logrus.WithFields(logrus.Fields{"project": identifier})
 
 	url := fmt.Sprintf(
@@ -228,62 +249,4 @@ func (collector *TeamCityCollector) collectProjectBuildMetrics(identifier string
 	}
 
 	return nil
-}
-
-type BuildStatus int
-type BuildState int
-
-const (
-	BuildStateUnknown BuildState = iota
-	BuildQueued
-	BuildFinished
-	BuildRunning
-	BuildDeleted
-)
-
-const (
-	BuildStatusUnknown BuildStatus = iota
-	BuildSuccess
-	BuildFailure
-)
-
-func ParseBuildState(s string) BuildState {
-	switch s {
-	case "queued":
-		return BuildQueued
-	case "finished":
-		return BuildFinished
-	case "running":
-		return BuildRunning
-	case "deleted":
-		return BuildDeleted
-	}
-	return BuildStateUnknown
-}
-
-func ParseBuildStatus(s string) BuildStatus {
-	switch s {
-	case "SUCCESS":
-		return BuildSuccess
-	case "FAILURE":
-		return BuildFailure
-	}
-	return BuildStatusUnknown
-}
-
-type Build struct {
-	ID          uint64       `json:"id"`
-	BuildTypeID string       `json:"buildTypeId"`
-	Status      string       `json:"status"`
-	State       string       `json:"state"`
-	StartDate   TeamCityTime `json:"startDate,omitempty"`
-	FinishDate  TeamCityTime `json:"finishDate,omitempty"`
-}
-
-type BuildResponse struct {
-	Count    uint64  `json:"count"`
-	HRef     string  `json:"href,omitempty"`
-	NextHRef string  `json:"nextHref,omitempty"`
-	PrevHRef string  `json:"prevHref,omitempty"`
-	Builds   []Build `json:"build"`
 }

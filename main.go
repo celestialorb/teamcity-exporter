@@ -75,11 +75,10 @@ func main() {
 		logrus.Error(err)
 	}
 
-	collector := NewTeamCityCollector()
-	collector.client = client
-
 	logrus.Info("registering TeamCity metrics collector")
-	prometheus.MustRegister(collector)
+	prometheus.MustRegister(NewTeamCityAgentCollector(client))
+	prometheus.MustRegister(NewTeamCityBuildsCollector(client))
+	prometheus.MustRegister(NewTeamCityProjectsCollector(client))
 
 	http.Handle(viper.GetString("metrics.path"), promhttp.Handler())
 	err = http.ListenAndServe(fmt.Sprintf("%s:%d", viper.GetString("metrics.listen"), viper.GetInt("metrics.port")), nil)

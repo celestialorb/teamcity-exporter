@@ -17,16 +17,34 @@ environment variable.
 
 ## Metrics
 
-The metrics exported by this exporter are described in the table below.
+The metrics exported by this exporter are described in the sections below.
+
+### Agent Metrics
+
+| Name                                 | Description                                             | Labels                   |
+|--------------------------------------|---------------------------------------------------------|--------------------------|
+| `teamcity_agent_authorized`          | The authorized status of the TeamCity agent.            | `agent_id`, `agent_name` |
+| `teamcity_agent_connected`           | The connected status of the TeamCity agent.             | `agent_id`, `agent_name` |
+| `teamcity_agent_enabled`             | The enabled status of the TeamCity agent.               | `agent_id`, `agent_name` |
+| `teamcity_agent_current_build_id`    | The identifier of the TeamCity agent's current build.   | `agent_id`, `agent_name` |
+
+`teamcity_agent_current_build_id` will be zero if the TeamCity agent is not currently running a build.
+
+### Build Metrics
+
+| Name                                 | Description                                             | Labels                                    |
+|--------------------------------------|---------------------------------------------------------|-------------------------------------------|
+| `teamcity_build_start_time`          | The start time of a TeamCity build job.                 | `project_id`, `build_type_id`, `build_id` |
+| `teamcity_build_finish_time`         | The finish time of a TeamCity build job.                | `project_id`, `build_type_id`, `build_id` |
+| `teamcity_build_state`               | The state of a TeamCity build job.                      | `project_id`, `build_type_id`, `build_id` |
+| `teamcity_build_status`              | The status of a TeamCity build job.                     | `project_id`, `build_type_id`, `build_id` |
+
+### Project Metrics
 
 | Name                                 | Description                                             | Labels                                    |
 |--------------------------------------|---------------------------------------------------------|-------------------------------------------|
 | `teamcity_projects_total`            | The total number of subprojects for a TeamCity project. | `project_id`                              |
 | `teamcity_project_build_types_total` | The total number of build types for a TeamCity project. | `project_id`                              |
-| `teamcity_build_start_time`          | The start time of a TeamCity build job.                 | `project_id`, `build_type_id`, `build_id` |
-| `teamcity_build_finish_time`         | The finish time of a TeamCity build job.                | `project_id`, `build_type_id`, `build_id` |
-| `teamcity_build_state`               | The state of a TeamCity build job.                      | `project_id`, `build_type_id`, `build_id` |
-| `teamcity_build_status`              | The status of a TeamCity build job.                     | `project_id`, `build_type_id`, `build_id` |
 
 ### Build State
 
